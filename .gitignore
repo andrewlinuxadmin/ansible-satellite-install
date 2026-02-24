@@ -1,0 +1,5 @@
+.*
+!.gitignore
+collections/
+files/
+inventory-andrew.ini
