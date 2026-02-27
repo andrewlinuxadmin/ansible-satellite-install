@@ -177,7 +177,7 @@
 
 - name: Check if manifest is already imported
   ansible.builtin.command: >-
-    hammer -u "{{ satellite_install_username }}"
+    hammer --csv -u "{{ satellite_install_username }}"
     -p "{{ satellite_install_password }}"
     subscription list
     --organization "{{ satellite_install_organization }}"
@@ -192,7 +192,7 @@
     src: "{{ satellite_install_manifest_path | default('manifest.zip') }}"
     dest: /root/manifest.zip
     mode: "0644"
-  when: satellite_install_force_manifest | default(false) or manifest_check.stdout | length == 0
+  when: satellite_install_force_manifest | default(false) or manifest_check.stdout_lines | length <= 1
   tags:
     - manifest
 
@@ -208,7 +208,7 @@
     satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
     satellite_username: "{{ satellite_install_username }}"
     satellite_password: "{{ satellite_install_password }}"
-  when: satellite_install_force_manifest | default(false) or manifest_check.stdout | length == 0
+  when: satellite_install_force_manifest | default(false) or manifest_check.stdout_lines | length <= 1
   tags:
     - manifest
 
