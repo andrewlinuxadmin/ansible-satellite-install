@@ -33,10 +33,6 @@
     - https
     - ssh
     - mqtt
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - firewall
 
@@ -49,10 +45,6 @@
   loop:
     - 8000/tcp
     - 9090/tcp
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - firewall
 
@@ -62,10 +54,6 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     line: "{{ ansible_facts.default_ipv4['address'] }} {{ ansible_facts['nodename'] }} {{ ansible_facts['hostname'] }}"
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
 
 # ── RHSM Registration ──────────────────────────────────────────
 
@@ -86,20 +74,12 @@
 
 - name: Subscription-manager clean
   ansible.builtin.command: subscription-manager clean
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
 
 - name: Clean yum cache
   ansible.builtin.command: yum clean all
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -110,10 +90,6 @@
     username: "{{ satellite_install_rhsm_username }}"
     password: "{{ satellite_install_rhsm_password }}"
     force_register: true
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -122,10 +98,6 @@
   community.general.rhsm_repository:
     name: '*'
     state: disabled
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -138,10 +110,6 @@
       - "satellite-{{ satellite_install_version }}-for-rhel-9-x86_64-rpms"
       - "satellite-maintenance-{{ satellite_install_version }}-for-rhel-9-x86_64-rpms"
     state: enabled
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -152,10 +120,6 @@
   ansible.builtin.yum:
     name: '*'
     state: latest # noqa package-latest
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - update
 
@@ -236,10 +200,6 @@
     src: "{{ satellite_install_manifest_path | default('manifest.zip') }}"
     dest: /root/manifest.zip
     mode: "0644"
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   when: satellite_install_force_manifest | default(false) or manifest_check.stdout_lines | length <= 1
   tags:
     - manifest
