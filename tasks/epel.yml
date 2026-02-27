@@ -51,6 +51,28 @@
   tags:
     - repos
 
+# ── EPEL Sync Plan ──────────────────────────────────────────────
+
+- name: Configuring Sync Plan for EPEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.sync_plans
+    apply:
+      tags:
+        - sync-plan
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_sync_plans:
+      - name: Daily Sync EPEL
+        interval: daily
+        sync_date: "{{ lookup('ansible.builtin.pipe', 'date +\"%Y-%m-%d 03:00:00 GMT\"') }}"
+        products:
+          - EPEL
+  tags:
+    - sync-plan
+
 # ── EPEL Sync ───────────────────────────────────────────────────
 
 - name: "Repo Sync - EPEL"

@@ -285,9 +285,8 @@
       - name: Daily Sync
         interval: daily
         sync_date: "{{ lookup('ansible.builtin.pipe', 'date +\"%Y-%m-%d 03:00:00 GMT\"') }}"
-        products: >-
-          {{ ['Red Hat Enterprise Linux for x86_64']
-             + (['EPEL'] if satellite_install_epel | default(false) else []) }}
+        products:
+          - Red Hat Enterprise Linux for x86_64
   tags:
     - sync-plan
 
