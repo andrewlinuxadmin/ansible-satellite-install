@@ -1,0 +1,459 @@
+---
+# ── Validate required variables ─────────────────────────────────
+
+- name: Validate required variables
+  ansible.builtin.assert:
+    that:
+      - satellite_install_username is defined
+      - satellite_install_password is defined
+      - satellite_install_organization is defined
+      - satellite_install_location is defined
+      - satellite_install_version is defined
+      - satellite_install_manifest_path is defined
+      - satellite_install_rhel_versions is defined
+      - satellite_install_rhel_versions | length > 0
+      - satellite_install_lifecycle_envs is defined
+      - satellite_install_lifecycle_envs | length > 0
+      - satellite_install_rhsm_username is defined
+      - satellite_install_rhsm_password is defined
+    fail_msg: >-
+      One or more required variables are not defined.
+      Check the include_role vars in the playbook.
+
+# ── Firewall ────────────────────────────────────────────────────
+
+- name: Configuring firewall services
+  ansible.posix.firewalld:
+    service: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - http
+    - https
+    - ssh
+    - mqtt
+  tags:
+    - firewall
+
+- name: Configuring firewall ports
+  ansible.posix.firewalld:
+    port: "{{ item }}"
+    permanent: true
+    immediate: true
+    state: enabled
+  loop:
+    - 8000/tcp
+    - 9090/tcp
+  tags:
+    - firewall
+
+# ── /etc/hosts ──────────────────────────────────────────────────
+
+- name: Adding the entry to /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    line: "{{ ansible_facts.default_ipv4['address'] }} {{ ansible_facts['nodename'] }} {{ ansible_facts['hostname'] }}"
+
+# ── RHSM Registration ──────────────────────────────────────────
+
+- name: Check if server is registered to RHSM
+  ansible.builtin.command: subscription-manager identity
+  register: rhsm_status
+  changed_when: false
+  failed_when: false
+  tags:
+    - register
+
+- name: Subscription-manager unregister
+  ansible.builtin.command: subscription-manager unregister
+  failed_when: false
+  when: rhsm_status.rc != 0
+  tags:
+    - register
+
+- name: Subscription-manager clean
+  ansible.builtin.command: subscription-manager clean
+  when: rhsm_status.rc != 0
+  tags:
+    - register
+
+- name: Clean yum cache
+  ansible.builtin.command: yum clean all
+  when: rhsm_status.rc != 0
+  tags:
+    - register
+
+- name: Register to RHSM
+  community.general.redhat_subscription:
+    state: present
+    username: "{{ satellite_install_rhsm_username }}"
+    password: "{{ satellite_install_rhsm_password }}"
+    force_register: true
+  when: rhsm_status.rc != 0
+  tags:
+    - register
+
+- name: Disabling all the repos
+  community.general.rhsm_repository:
+    name: '*'
+    state: disabled
+  when: rhsm_status.rc != 0
+  tags:
+    - register
+
+- name: Enabling the Satellite repos
+  community.general.rhsm_repository:
+    name:
+      - "rhel-9-for-x86_64-baseos-rpms"
+      - "rhel-9-for-x86_64-appstream-rpms"
+      - "satellite-{{ satellite_install_version }}-for-rhel-9-x86_64-rpms"
+      - "satellite-maintenance-{{ satellite_install_version }}-for-rhel-9-x86_64-rpms"
+    state: enabled
+  when: rhsm_status.rc != 0
+  tags:
+    - register
+
+# ── Install ─────────────────────────────────────────────────────
+
+- name: Updating the server
+  ansible.builtin.yum:
+    name: '*'
+    state: latest # noqa package-latest
+  tags:
+    - update
+
+- name: Gather installed packages
+  ansible.builtin.package_facts:
+    manager: rpm
+  tags:
+    - install
+
+- name: Install common packages
+  ansible.builtin.yum:
+    name:
+      - jq
+      - unzip
+      - wget
+      - curl
+      - git
+      - vim
+      - ansible-core
+  when: "'satellite' not in ansible_facts.packages"
+  tags:
+    - install
+
+- name: Installing Satellite Package
+  ansible.builtin.yum:
+    name: satellite
+    state: present
+  register: satellite_pkg
+  retries: 3
+  delay: 10
+  until: satellite_pkg is success
+  when: "'satellite' not in ansible_facts.packages"
+  tags:
+    - install
+
+- name: Installing Satellite
+  ansible.builtin.include_role:
+    name: redhat.satellite_operations.installer
+    apply:
+      tags:
+        - install
+  vars:
+    satellite_installer_scenario: "{{ satellite_install_scenario }}"
+    satellite_installer_options:
+      - '--foreman-initial-organization "{{ satellite_install_organization }}"'
+      - '--foreman-initial-location "{{ satellite_install_location }}"'
+      - '--foreman-initial-admin-password {{ satellite_install_password }}'
+      - "--tuning {{ satellite_install_tuning | default('default') }}"
+      - '--register-with-insights'
+      - '--foreman-proxy-plugin-remote-execution-script-mode pull-mqtt'
+  tags:
+    - install
+
+# ── Manifest ────────────────────────────────────────────────────
+
+- name: Check if manifest is already imported
+  ansible.builtin.command: >-
+    hammer -u "{{ satellite_install_username }}"
+    -p "{{ satellite_install_password }}"
+    subscription list
+    --organization "{{ satellite_install_organization }}"
+  register: manifest_check
+  changed_when: false
+  failed_when: false
+  tags:
+    - manifest
+
+- name: Copying the manifest
+  ansible.builtin.copy:
+    src: "{{ satellite_install_manifest_path | default('manifest.zip') }}"
+    dest: /root/manifest.zip
+    mode: "0644"
+  when: satellite_install_force_manifest | default(false) or manifest_check.stdout | length == 0
+  tags:
+    - manifest
+
+- name: Importing the manifest
+  ansible.builtin.include_role:
+    name: redhat.satellite.manifest
+    apply:
+      tags:
+        - manifest
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_manifest_path: "/root/manifest.zip"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+  when: satellite_install_force_manifest | default(false) or manifest_check.stdout | length == 0
+  tags:
+    - manifest
+
+- name: Refreshing the Manifest
+  ansible.builtin.command: >-
+    hammer -u "{{ satellite_install_username }}"
+    -p "{{ satellite_install_password }}"
+    subscription refresh-manifest
+    --organization "{{ satellite_install_organization }}"
+  tags:
+    - manifest
+
+# ── Repositories ────────────────────────────────────────────────
+
+- name: Enabling Red Hat Enterprise Linux repositories
+  ansible.builtin.include_role:
+    name: redhat.satellite.repositories
+    apply:
+      tags:
+        - repos
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_products:
+      - name: Red Hat Enterprise Linux for x86_64
+        repository_sets:
+          - name: "Red Hat Enterprise Linux {{ rhel_ver }} for x86_64 - BaseOS (RPMs)"
+            releasever: "{{ rhel_ver }}"
+          - name: "Red Hat Enterprise Linux {{ rhel_ver }} for x86_64 - AppStream (RPMs)"
+            releasever: "{{ rhel_ver }}"
+          - name: "Red Hat Satellite Client 6 for RHEL {{ rhel_ver }} x86_64 (RPMs)"
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - repos
+
+# ── Sync ────────────────────────────────────────────────────────
+
+- name: Set default download policy
+  redhat.satellite.setting:
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    name: default_download_policy
+    value: "{{ satellite_install_download_policy | default('immediate') }}"
+  tags:
+    - sync
+
+- name: "Repo Sync - Red Hat Enterprise Linux for x86_64"
+  redhat.satellite.repository_sync:
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    organization: "{{ satellite_install_organization }}"
+    product: "Red Hat Enterprise Linux for x86_64"
+  tags:
+    - sync
+
+- name: Configuring Sync Plans
+  ansible.builtin.include_role:
+    name: redhat.satellite.sync_plans
+    apply:
+      tags:
+        - sync-plan
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_sync_plans:
+      - name: Daily Sync
+        interval: daily
+        sync_date: "{{ lookup('ansible.builtin.pipe', 'date +\"%Y-%m-%d 03:00:00 GMT\"') }}"
+        products: >-
+          {{ ['Red Hat Enterprise Linux for x86_64']
+             + (['EPEL'] if satellite_install_epel | default(false) else []) }}
+  tags:
+    - sync-plan
+
+# ── Lifecycle Environments ──────────────────────────────────────
+
+- name: Configuring Lifecycle Environments
+  ansible.builtin.include_role:
+    name: redhat.satellite.lifecycle_environments
+    apply:
+      tags:
+        - lifecycle
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_lifecycle_environments: "{{ satellite_install_lifecycle_envs }}"
+  tags:
+    - lifecycle
+
+# ── Content Views (RHEL) ───────────────────────────────────────
+
+- name: Configuring Content Views for RHEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.content_views
+    apply:
+      tags:
+        - content-view
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_content_views:
+      - name: "cv_rhel{{ rhel_ver }}"
+        repositories:
+          - name: "Red Hat Enterprise Linux {{ rhel_ver }} for x86_64 - BaseOS RPMs {{ rhel_ver }}"
+            product: 'Red Hat Enterprise Linux for x86_64'
+          - name: "Red Hat Enterprise Linux {{ rhel_ver }} for x86_64 - AppStream RPMs {{ rhel_ver }}"
+            product: 'Red Hat Enterprise Linux for x86_64'
+          - name: "Red Hat Satellite Client 6 for RHEL {{ rhel_ver }} x86_64 RPMs"
+            product: 'Red Hat Enterprise Linux for x86_64'
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - content-view
+
+# ── Publish & Promote (RHEL) ───────────────────────────────────
+
+- name: Publishing Content Views for RHEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.content_view_publish
+    apply:
+      tags:
+        - publish
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_content_views:
+      - "cv_rhel{{ rhel_ver }}"
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - publish
+
+- name: Waiting for the publish task to finish
+  ansible.builtin.pause:
+    minutes: 5
+  tags:
+    - publish
+
+- name: "Ensure content view gets promoted to lifecycle environments for RHEL"
+  redhat.satellite.content_view_version:
+    organization: "{{ satellite_install_organization }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    content_view: "cv_rhel{{ item }}"
+    lifecycle_environments: "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
+  loop: "{{ satellite_install_rhel_versions }}"
+  tags:
+    - promote
+
+# ── Activation Keys (RHEL) ─────────────────────────────────────
+
+- name: Configuring Activation Keys for RHEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.activation_keys
+    apply:
+      tags:
+        - ak
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_activation_keys:
+      - name: "ak_{{ outer_item.1 | lower }}_rhel{{ outer_item.0 }}"
+        release_version: "{{ outer_item.0 }}"
+        lifecycle_environment: "{{ outer_item.1 }}"
+        content_view: "cv_rhel{{ outer_item.0 }}"
+  with_nested:
+    - "{{ satellite_install_rhel_versions }}"
+    - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
+  loop_control:
+    loop_var: outer_item
+  tags:
+    - ak
+
+# ── Global Parameters ──────────────────────────────────────────
+
+- name: "Creating Global Parameters"
+  redhat.satellite.global_parameter:
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+  loop:
+    - name: "host_packages"
+      value: "katello-host-tools"
+    - name: "host_registration_insights"
+      value: true
+    - name: "host_registration_remote_execution"
+      value: true
+    - name: "host_registration_remote_execution_pull"
+      value: true
+  tags:
+    - global-parameter
+
+# ── Host Groups (RHEL) ─────────────────────────────────────────
+
+- name: Configuring Host Groups for RHEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.hostgroups
+    apply:
+      tags:
+        - hostgroups
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_hostgroups:
+      - name: "hg_{{ outer_item.1 | lower }}_rhel{{ outer_item.0 }}"
+        organization: "{{ satellite_install_organization }}"
+        location: "{{ satellite_install_location }}"
+        lifecycle_environment: "{{ outer_item.1 }}"
+        content_view: "cv_rhel{{ outer_item.0 }}"
+        activation_keys: "ak_{{ outer_item.1 | lower }}_rhel{{ outer_item.0 }}"
+        architecture: "x86_64"
+  with_nested:
+    - "{{ satellite_install_rhel_versions }}"
+    - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
+  loop_control:
+    loop_var: outer_item
+  tags:
+    - hostgroups
+
+# ── EPEL (conditional) ─────────────────────────────────────────
+
+- name: Configuring EPEL content
+  ansible.builtin.import_tasks: epel.yml
+  when: satellite_install_epel | default(false)

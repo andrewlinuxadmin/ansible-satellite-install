@@ -1,4 +1,10 @@
 ---
+roles:
+  - src: https://github.com/acarlos/ansible-satellite-install.git
+    scm: git
+    version: main
+    name: satellite_install
+
 collections:
   - name: community.general
   - name: ansible.posix

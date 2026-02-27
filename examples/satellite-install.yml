@@ -1,0 +1,36 @@
+---
+- name: Satellite Installer Playbook
+  hosts: all
+
+  vars_prompt:
+    - name: satellite_install_rhsm_username
+      prompt: "RHSM Username"
+      private: false
+    - name: satellite_install_rhsm_password
+      prompt: "RHSM Password"
+      private: true
+
+  tasks:
+    - name: Install and configure Red Hat Satellite
+      ansible.builtin.include_role:
+        name: satellite_install
+      vars:
+        satellite_install_username: "admin"
+        satellite_install_password: "redhat"
+        satellite_install_organization: "ACME"
+        satellite_install_location: "ACME"
+        satellite_install_version: "6.18"
+        satellite_install_base_os: "rhel9"
+        satellite_install_manifest_path: "manifest.zip"
+        satellite_install_rhel_versions:
+          - 8
+          - 9
+          - 10
+        satellite_install_epel: true
+        satellite_install_lifecycle_envs:
+          - name: "DEV"
+            prior: "Library"
+          - name: "HML"
+            prior: "DEV"
+          - name: "PRD"
+            prior: "HML"

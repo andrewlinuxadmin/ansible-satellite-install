@@ -1,82 +1,154 @@
-# Ansible Satellite Install
+# satellite_install
 
-Playbook for automated installation and configuration of Red Hat Satellite 6.18.
+Ansible role for automated installation and configuration
+of Red Hat Satellite.
 
-## Prerequisites
+## Requirements
 
-- RHEL 9 (x86_64)
-- Ansible Core 2.14+
-- Red Hat Satellite manifest (`manifest.zip`) placed inside the `files/` directory
+- RHEL 9 (x86_64) target host
+- Ansible Core >= 2.14
+- Python >= 3.9
+- Red Hat Satellite manifest (`manifest.zip`)
 - Red Hat CDN access (RHSM credentials)
 
-## Structure
+## Installation
 
-```
-├── ansible.cfg
-├── files/
-│   └── manifest.zip       # Satellite manifest (required)
-├── inventory.ini
-├── requirements.yml
-├── satellite.yml
-└── README.md
-```
-
-## Installing collections
+The `requirements.yml` shipped with this repository
+installs both the role **and** all required collections
+(including Satellite collections from their Git
+repositories) in a single command:
 
 ```bash
+ansible-galaxy install -r requirements.yml
+```
+
+This is equivalent to running both commands separately:
+
+```bash
+ansible-galaxy role install \
+  git+https://github.com/acarlos/ansible-satellite-install.git,main
 ansible-galaxy collection install -r requirements.yml
 ```
 
-## Main variables
+> **Note:** `ansible-galaxy role install` alone does
+> **not** install collection dependencies. Always use
+> `ansible-galaxy install -r requirements.yml` to ensure
+> everything is in place.
+
+## Role variables
+
+### Required (must be passed via playbook vars)
+
+| Variable | Description |
+| --- | --- |
+| `satellite_install_username` | Satellite admin username |
+| `satellite_install_password` | Satellite admin password |
+| `satellite_install_organization` | Initial organization |
+| `satellite_install_location` | Initial location |
+| `satellite_install_version` | Satellite version |
+| `satellite_install_manifest_path` | Manifest file path |
+| `satellite_install_rhel_versions` | RHEL versions list |
+| `satellite_install_lifecycle_envs` | Lifecycle environments |
+| `satellite_install_rhsm_username` | RHSM username |
+| `satellite_install_rhsm_password` | RHSM password |
+
+### Optional (have defaults in `defaults/main.yml`)
 
 | Variable | Default | Description |
-|---|---|---|
-| `sat_user` | `admin` | Satellite admin username |
-| `sat_pass` | `redhat` | Admin password |
-| `sat_org` | `ACME` | Initial organization |
-| `sat_location` | `ACME` | Initial location |
-| `sat_version` | `6.18` | Satellite version |
-| `rhel_versions` | `[8, 9]` | RHEL versions for repos/CVs setup |
-| `epel` | `true` | Enable EPEL repositories |
-| `download_policy` | `on_demand` | Repository download policy |
-| `tuning` | `default` | Satellite tuning profile |
-| `manifest_path` | `manifest.zip` | Manifest file path |
-| `force_manifest_import` | `false` | Force manifest reimport |
-| `lifecycle_environments` | DEV/HML/PRD | List of lifecycle environments |
+| --- | --- | --- |
+| `satellite_install_scenario` | `"satellite"` | Scenario |
+| `satellite_install_download_policy` | `"on_demand"` | Download policy |
+| `satellite_install_tuning` | `"default"` | Tuning profile |
+| `satellite_install_force_manifest` | `false` | Force reimport |
+| `satellite_install_epel` | *(not set)* | Enable EPEL |
 
 ## Usage
 
+A complete example playbook, inventory and configuration
+are available in the
+[examples/](examples/) directory.
+
+```yaml
+---
+- name: Satellite Installer Playbook
+  hosts: satellite
+
+  vars_prompt:
+    - name: satellite_install_rhsm_username
+      prompt: "RHSM Username"
+      private: false
+    - name: satellite_install_rhsm_password
+      prompt: "RHSM Password"
+      private: true
+
+  tasks:
+    - name: Install and configure Red Hat Satellite
+      ansible.builtin.include_role:
+        name: satellite_install
+      vars:
+        satellite_install_username: "admin"
+        satellite_install_password: "redhat"
+        satellite_install_organization: "ACME"
+        satellite_install_location: "ACME"
+        satellite_install_version: "6.18"
+        satellite_install_manifest_path: "manifest.zip"
+        satellite_install_rhel_versions:
+          - 8
+          - 9
+          - 10
+        satellite_install_epel: true
+        satellite_install_lifecycle_envs:
+          - name: "DEV"
+            prior: "Library"
+          - name: "HML"
+            prior: "DEV"
+          - name: "PRD"
+            prior: "HML"
+```
+
+### Run specific steps using tags
+
 ```bash
-# Full installation
-ansible-playbook satellite.yml
+ansible-playbook satellite-install.yml --tags repos
+```
 
-# Run specific steps using tags
-ansible-playbook satellite.yml --tags repos
+### Force manifest reimport
 
-# Force manifest reimport
-ansible-playbook satellite.yml --tags manifest -e force_manifest_import=true
+```bash
+ansible-playbook satellite-install.yml --tags manifest \
+  -e satellite_install_force_manifest=true
 ```
 
 ## Available tags
 
 | Tag | Description |
-|---|---|
+| --- | --- |
 | `firewall` | Firewall configuration |
-| `register` | RHSM registration and repo enablement |
+| `register` | RHSM registration |
 | `update` | Server update |
 | `install` | Satellite installation |
 | `manifest` | Manifest import |
-| `repos` | Repository enablement (RHEL + EPEL) |
+| `repos` | Repository enablement |
 | `sync` | Repository synchronization |
 | `sync-plan` | Sync plan configuration |
-| `lifecycle` | Lifecycle environment configuration |
+| `lifecycle` | Lifecycle environments |
 | `content-view` | Content view creation |
 | `publish` | Content view publishing |
 | `promote` | Content view promotion |
 | `ak` | Activation key creation |
-| `global-parameter` | Global parameter configuration |
+| `global-parameter` | Global parameters |
 | `hostgroups` | Host group configuration |
 
 ## Acknowledgments
 
-This playbook was inspired by the [Satellite Foreman Easy Installer](https://github.com/Qikfix/satellite_foreman_easy-installer) project by [Waldirio Pinheiro (Qikfix)](https://github.com/Qikfix). Thank you for the original work and inspiration!
+This role was inspired by the
+[Satellite Foreman Easy Installer][1] project
+by [Waldirio Pinheiro (Qikfix)][2].
+Thank you for the original work and inspiration!
+
+[1]: https://github.com/Qikfix/satellite_foreman_easy-installer
+[2]: https://github.com/Qikfix
+
+## License
+
+MIT

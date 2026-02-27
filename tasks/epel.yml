@@ -1,0 +1,226 @@
+---
+# ── EPEL Repositories ───────────────────────────────────────────
+
+- name: Creating EPEL content credential
+  ansible.builtin.include_role:
+    name: redhat.satellite.content_credentials
+    apply:
+      tags:
+        - repos
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_content_credentials:
+      - name: RPM-GPG-KEY-EPEL-{{ rhel_ver }}
+        content_type: gpg_key
+        content: "{{ lookup('url', 'https://dl.fedoraproject.org/pub/epel/RPM-GPG-KEY-EPEL-' + rhel_ver | string, split_lines=False) }}"
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - repos
+
+- name: Creating EPEL product
+  redhat.satellite.product:
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    organization: "{{ satellite_install_organization }}"
+    name: EPEL
+    state: present
+  tags:
+    - repos
+
+- name: Creating EPEL repositories
+  redhat.satellite.repository:
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    organization: "{{ satellite_install_organization }}"
+    product: EPEL
+    name: "EPEL-{{ rhel_ver }}"
+    content_type: yum
+    url: "https://dl.fedoraproject.org/pub/epel/{{ rhel_ver }}/Everything/x86_64/"
+    gpg_key: "RPM-GPG-KEY-EPEL-{{ rhel_ver }}"
+    state: present
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - repos
+
+# ── EPEL Sync ───────────────────────────────────────────────────
+
+- name: "Repo Sync - EPEL"
+  redhat.satellite.repository_sync:
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    organization: "{{ satellite_install_organization }}"
+    product: "EPEL"
+  tags:
+    - sync
+
+# ── EPEL Content Views ─────────────────────────────────────────
+
+- name: Configuring Content Views for EPEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.content_views
+    apply:
+      tags:
+        - content-view
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_content_views:
+      - name: "cv_epel{{ rhel_ver }}"
+        repositories:
+          - name: "EPEL-{{ rhel_ver }}"
+            product: 'EPEL'
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - content-view
+
+- name: Configuring Composite Content Views for RHEL + EPEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.content_views
+    apply:
+      tags:
+        - content-view
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_content_views:
+      - name: "ccv_rhel{{ rhel_ver }}_epel"
+        auto_publish: true
+        components:
+          - content_view: "cv_rhel{{ rhel_ver }}"
+            latest: true
+          - content_view: "cv_epel{{ rhel_ver }}"
+            latest: true
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - content-view
+
+# ── EPEL Publish & Promote ─────────────────────────────────────
+
+- name: Publishing Content Views for EPEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.content_view_publish
+    apply:
+      tags:
+        - publish
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_content_views:
+      - "cv_epel{{ rhel_ver }}"
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - publish
+
+- name: Waiting for the EPEL publish task to finish
+  ansible.builtin.pause:
+    minutes: 5
+  tags:
+    - publish
+
+- name: Publishing Composite Content Views for RHEL + EPEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.content_view_publish
+    apply:
+      tags:
+        - publish
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_content_views:
+      - "ccv_rhel{{ rhel_ver }}_epel"
+  loop: "{{ satellite_install_rhel_versions }}"
+  loop_control:
+    loop_var: rhel_ver
+  tags:
+    - publish
+
+- name: "Ensure content view gets promoted to lifecycle environments for RHEL + EPEL"
+  redhat.satellite.content_view_version:
+    organization: "{{ satellite_install_organization }}"
+    server_url: "https://{{ ansible_facts['nodename'] }}"
+    username: "{{ satellite_install_username }}"
+    password: "{{ satellite_install_password }}"
+    content_view: "ccv_rhel{{ item }}_epel"
+    lifecycle_environments: "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
+  loop: "{{ satellite_install_rhel_versions }}"
+  tags:
+    - promote
+
+# ── EPEL Activation Keys ───────────────────────────────────────
+
+- name: Configuring Activation Keys for RHEL + EPEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.activation_keys
+    apply:
+      tags:
+        - ak
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_activation_keys:
+      - name: "ak_{{ outer_item.1 | lower }}_rhel{{ outer_item.0 }}_epel"
+        release_version: "{{ outer_item.0 }}"
+        lifecycle_environment: "{{ outer_item.1 }}"
+        content_view: "ccv_rhel{{ outer_item.0 }}_epel"
+  with_nested:
+    - "{{ satellite_install_rhel_versions }}"
+    - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
+  loop_control:
+    loop_var: outer_item
+  tags:
+    - ak
+
+# ── EPEL Host Groups ───────────────────────────────────────────
+
+- name: Configuring Host Groups for RHEL + EPEL
+  ansible.builtin.include_role:
+    name: redhat.satellite.hostgroups
+    apply:
+      tags:
+        - hostgroups
+  vars:
+    satellite_organization: "{{ satellite_install_organization }}"
+    satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
+    satellite_username: "{{ satellite_install_username }}"
+    satellite_password: "{{ satellite_install_password }}"
+    satellite_hostgroups:
+      - name: "hg_{{ outer_item.1 | lower }}_rhel{{ outer_item.0 }}_epel"
+        organization: "{{ satellite_install_organization }}"
+        location: "{{ satellite_install_location }}"
+        lifecycle_environment: "{{ outer_item.1 }}"
+        content_view: "ccv_rhel{{ outer_item.0 }}_epel"
+        activation_keys: "ak_{{ outer_item.1 | lower }}_rhel{{ outer_item.0 }}_epel"
+        architecture: "x86_64"
+  with_nested:
+    - "{{ satellite_install_rhel_versions }}"
+    - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
+  loop_control:
+    loop_var: outer_item
+  tags:
+    - hostgroups

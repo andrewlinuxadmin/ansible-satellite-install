@@ -1,0 +1,6 @@
+---
+skip_list:
+  - var-naming[no-role-prefix]
+  - command-instead-of-module
+  - command-instead-of-shell
+  - no-changed-when

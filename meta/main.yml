@@ -1,0 +1,30 @@
+---
+galaxy_info:
+  role_name: satellite_install
+  namespace: acarlos
+  author: acarlos
+  description: >-
+    Automated installation and configuration of
+    Red Hat Satellite using Ansible
+  license: MIT
+  min_ansible_version: "2.14"
+
+  platforms:
+    - name: EL
+      versions:
+        - "9"
+
+  galaxy_tags:
+    - satellite
+    - redhat
+    - rhel
+    - foreman
+    - katello
+
+dependencies: []
+
+collections:
+  - community.general
+  - ansible.posix
+  - redhat.satellite_operations
+  - redhat.satellite
