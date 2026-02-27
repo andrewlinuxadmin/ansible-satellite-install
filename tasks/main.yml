@@ -174,10 +174,6 @@
       - "--tuning {{ satellite_install_tuning | default('default') }}"
       - '--register-with-insights'
       - '--foreman-proxy-plugin-remote-execution-script-mode pull-mqtt'
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - install
 
@@ -216,10 +212,6 @@
     satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
     satellite_username: "{{ satellite_install_username }}"
     satellite_password: "{{ satellite_install_password }}"
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   when: satellite_install_force_manifest | default(false) or manifest_check.stdout_lines | length <= 1
   tags:
     - manifest
@@ -261,10 +253,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - repos
 
@@ -315,10 +303,6 @@
         sync_date: "{{ lookup('ansible.builtin.pipe', 'date +\"%Y-%m-%d 03:00:00 GMT\"') }}"
         products:
           - Red Hat Enterprise Linux for x86_64
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - sync-plan
 
@@ -336,10 +320,6 @@
     satellite_username: "{{ satellite_install_username }}"
     satellite_password: "{{ satellite_install_password }}"
     satellite_lifecycle_environments: "{{ satellite_install_lifecycle_envs }}"
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - lifecycle
 
@@ -368,10 +348,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - content-view
 
@@ -393,10 +369,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - publish
 
@@ -445,10 +417,6 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - ak
 
@@ -504,10 +472,6 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - hostgroups
 

@@ -19,10 +19,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - repos
 
@@ -82,10 +78,6 @@
         sync_date: "{{ lookup('ansible.builtin.pipe', 'date +\"%Y-%m-%d 03:00:00 GMT\"') }}"
         products:
           - EPEL
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - sync-plan
 
@@ -126,10 +118,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - content-view
 
@@ -155,10 +143,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - content-view
 
@@ -180,10 +164,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - publish
 
@@ -209,10 +189,6 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - publish
 
@@ -255,10 +231,6 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - ak
 
@@ -288,9 +260,5 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
-  register: _result
-  retries: "{{ satellite_install_retries }}"
-  delay: "{{ satellite_install_retry_delay }}"
-  until: _result is success
   tags:
     - hostgroups
