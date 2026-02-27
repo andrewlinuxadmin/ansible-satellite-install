@@ -3,3 +3,5 @@ satellite_install_scenario: "satellite"
 satellite_install_download_policy: "on_demand"
 satellite_install_tuning: "default"
 satellite_install_force_manifest: false
+satellite_install_retries: 3
+satellite_install_retry_delay: 10

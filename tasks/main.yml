@@ -33,6 +33,10 @@
     - https
     - ssh
     - mqtt
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - firewall
 
@@ -45,6 +49,10 @@
   loop:
     - 8000/tcp
     - 9090/tcp
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - firewall
 
@@ -54,6 +62,10 @@
   ansible.builtin.lineinfile:
     path: /etc/hosts
     line: "{{ ansible_facts.default_ipv4['address'] }} {{ ansible_facts['nodename'] }} {{ ansible_facts['hostname'] }}"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
 
 # ── RHSM Registration ──────────────────────────────────────────
 
@@ -74,12 +86,20 @@
 
 - name: Subscription-manager clean
   ansible.builtin.command: subscription-manager clean
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
 
 - name: Clean yum cache
   ansible.builtin.command: yum clean all
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -90,6 +110,10 @@
     username: "{{ satellite_install_rhsm_username }}"
     password: "{{ satellite_install_rhsm_password }}"
     force_register: true
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -98,6 +122,10 @@
   community.general.rhsm_repository:
     name: '*'
     state: disabled
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -110,6 +138,10 @@
       - "satellite-{{ satellite_install_version }}-for-rhel-9-x86_64-rpms"
       - "satellite-maintenance-{{ satellite_install_version }}-for-rhel-9-x86_64-rpms"
     state: enabled
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: rhsm_status.rc != 0
   tags:
     - register
@@ -120,6 +152,10 @@
   ansible.builtin.yum:
     name: '*'
     state: latest # noqa package-latest
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - update
 
@@ -139,6 +175,10 @@
       - git
       - vim
       - ansible-core
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: "'satellite' not in ansible_facts.packages"
   tags:
     - install
@@ -148,8 +188,8 @@
     name: satellite
     state: present
   register: satellite_pkg
-  retries: 3
-  delay: 10
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
   until: satellite_pkg is success
   when: "'satellite' not in ansible_facts.packages"
   tags:
@@ -170,6 +210,10 @@
       - "--tuning {{ satellite_install_tuning | default('default') }}"
       - '--register-with-insights'
       - '--foreman-proxy-plugin-remote-execution-script-mode pull-mqtt'
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - install
 
@@ -192,6 +236,10 @@
     src: "{{ satellite_install_manifest_path | default('manifest.zip') }}"
     dest: /root/manifest.zip
     mode: "0644"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: satellite_install_force_manifest | default(false) or manifest_check.stdout_lines | length <= 1
   tags:
     - manifest
@@ -208,6 +256,10 @@
     satellite_server_url: "https://{{ ansible_facts['nodename'] }}"
     satellite_username: "{{ satellite_install_username }}"
     satellite_password: "{{ satellite_install_password }}"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   when: satellite_install_force_manifest | default(false) or manifest_check.stdout_lines | length <= 1
   tags:
     - manifest
@@ -218,6 +270,10 @@
     -p "{{ satellite_install_password }}"
     subscription refresh-manifest
     --organization "{{ satellite_install_organization }}"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - manifest
 
@@ -245,6 +301,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - repos
 
@@ -257,6 +317,10 @@
     server_url: "https://{{ ansible_facts['nodename'] }}"
     name: default_download_policy
     value: "{{ satellite_install_download_policy | default('immediate') }}"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - sync
 
@@ -267,6 +331,10 @@
     server_url: "https://{{ ansible_facts['nodename'] }}"
     organization: "{{ satellite_install_organization }}"
     product: "Red Hat Enterprise Linux for x86_64"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - sync
 
@@ -287,6 +355,10 @@
         sync_date: "{{ lookup('ansible.builtin.pipe', 'date +\"%Y-%m-%d 03:00:00 GMT\"') }}"
         products:
           - Red Hat Enterprise Linux for x86_64
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - sync-plan
 
@@ -304,6 +376,10 @@
     satellite_username: "{{ satellite_install_username }}"
     satellite_password: "{{ satellite_install_password }}"
     satellite_lifecycle_environments: "{{ satellite_install_lifecycle_envs }}"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - lifecycle
 
@@ -332,6 +408,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - content-view
 
@@ -353,6 +433,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - publish
 
@@ -371,6 +455,10 @@
     content_view: "cv_rhel{{ item }}"
     lifecycle_environments: "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop: "{{ satellite_install_rhel_versions }}"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - promote
 
@@ -397,6 +485,10 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - ak
 
@@ -419,6 +511,10 @@
       value: true
     - name: "host_registration_remote_execution_pull"
       value: true
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - global-parameter
 
@@ -448,6 +544,10 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - hostgroups
 

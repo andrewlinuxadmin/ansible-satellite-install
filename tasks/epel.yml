@@ -19,6 +19,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - repos
 
@@ -30,6 +34,10 @@
     organization: "{{ satellite_install_organization }}"
     name: EPEL
     state: present
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - repos
 
@@ -48,6 +56,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - repos
 
@@ -70,6 +82,10 @@
         sync_date: "{{ lookup('ansible.builtin.pipe', 'date +\"%Y-%m-%d 03:00:00 GMT\"') }}"
         products:
           - EPEL
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - sync-plan
 
@@ -82,6 +98,10 @@
     server_url: "https://{{ ansible_facts['nodename'] }}"
     organization: "{{ satellite_install_organization }}"
     product: "EPEL"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - sync
 
@@ -106,6 +126,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - content-view
 
@@ -131,6 +155,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - content-view
 
@@ -152,6 +180,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - publish
 
@@ -177,6 +209,10 @@
   loop: "{{ satellite_install_rhel_versions }}"
   loop_control:
     loop_var: rhel_ver
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - publish
 
@@ -189,6 +225,10 @@
     content_view: "ccv_rhel{{ item }}_epel"
     lifecycle_environments: "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop: "{{ satellite_install_rhel_versions }}"
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - promote
 
@@ -215,6 +255,10 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - ak
 
@@ -244,5 +288,9 @@
     - "{{ satellite_install_lifecycle_envs | map(attribute='name') | list }}"
   loop_control:
     loop_var: outer_item
+  register: _result
+  retries: "{{ satellite_install_retries }}"
+  delay: "{{ satellite_install_retry_delay }}"
+  until: _result is success
   tags:
     - hostgroups

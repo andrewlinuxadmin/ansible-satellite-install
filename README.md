@@ -60,6 +60,8 @@ ansible-galaxy collection install -r requirements.yml
 | `satellite_install_download_policy` | `"on_demand"` | Download policy |
 | `satellite_install_tuning` | `"default"` | Tuning profile |
 | `satellite_install_force_manifest` | `false` | Force reimport |
+| `satellite_install_retries` | `3` | Task retry count |
+| `satellite_install_retry_delay` | `10` | Delay between retries (s) |
 | `satellite_install_epel` | *(not set)* | Enable EPEL |
 
 ## Usage
